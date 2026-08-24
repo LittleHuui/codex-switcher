@@ -1,0 +1,13 @@
+export { registerDefaultInteractiveAction } from "./interactive";
+export { registerDoctorCommand } from "./doctor";
+export { registerHelpCommand } from "./help";
+export { registerKeyringCommand } from "./keyring";
+export { registerLabelCommand } from "./label";
+export { type LoginDeps, registerLoginCommand } from "./login";
+export { registerMigrateSecretsCommand } from "./migrate-secrets";
+export { registerReloginCommand } from "./refresh";
+export { registerStatusCommand } from "./status";
+export { registerSwitchCommand, switchNext, switchToAccount } from "./switch";
+export { registerUsageCommand } from "./usage";
+export { registerUpdateSelfCommand } from "./update-self";
+export { registerVersionCommand } from "./version";
