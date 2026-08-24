@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 1.9.0
+
+### Features
+
+- Add a restricted `@huui/cdx-switcher/api` entry point for script integration.
+  It exposes structured account listing, current-account status and usage, and
+  label-based switching without exposing login flows or credential data.
+- Keep existing CLI commands and output unchanged by sharing the account-switch
+  sequence with the API's non-interactive service layer.
+- Publish TypeScript declarations and the Chinese `API.md` reference for the
+  API entry point.
+
 ## 1.8.7
 
 ### Community Fork Release

@@ -1,5 +1,5 @@
 import { refreshAccessToken } from "./oauth/auth";
-import { getSecretStoreAdapter } from "./secrets/store";
+import { getSecretStoreAdapter, type SecretStoreAdapter } from "./secrets/store";
 import type { OAuthPayload } from "./types";
 
 export type WindowSnapshot = {
@@ -60,9 +60,8 @@ export const fetchUsageRaw = async (
  */
 export const fetchUsage = async (
   accountId: string,
+  secretStore: SecretStoreAdapter = getSecretStoreAdapter(),
 ): Promise<UsageResult> => {
-  const secretStore = getSecretStoreAdapter();
-
   let payload: OAuthPayload;
   try {
     payload = await secretStore.load(accountId);

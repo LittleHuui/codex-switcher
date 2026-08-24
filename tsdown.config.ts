@@ -1,7 +1,8 @@
 import { defineConfig } from "tsdown";
 
 export default defineConfig({
-  entry: ["cdx.ts"],
+  entry: ["cdx.ts", "api.ts"],
+  dts: true,
   format: ["esm"],
   clean: true,
   treeshake: true,

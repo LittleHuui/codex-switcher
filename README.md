@@ -4,17 +4,6 @@
 
 > 非官方项目：本仓库基于 [bjesuiter/codex-switcher](https://github.com/bjesuiter/codex-switcher) 二次开发，遵循 MIT 许可证。原作者署名、许可证和本分叉声明见 [NOTICE](./NOTICE) 与 [LICENSE](./LICENSE)。本项目与原作者及 OpenAI 均不存在隶属、赞助或认可关系。
 
-## 当前版本
-
-### 1.8.7
-
-- 修复 Windows 上 OAuth 登录链接被 `cmd` 截断的问题，改用 Windows 系统 URL 协议处理器打开浏览器。
-- 更新 OAuth 请求的 scope、state 与 originator 兼容处理，并按当前 Codex CLI 的格式写入 `auth.json`。
-- 增加分叉来源说明、第三方依赖声明与发布前元数据检查。
-- 移除仅用于 PKCE 的第三方 OAuth 依赖，改用 Node 内置加密实现。
-
-完整变更记录见 [CHANGELOG.md](./CHANGELOG.md)。
-
 ## 使用范围与安全边界
 
 - 仅使用你本人拥有或已获授权使用的账号；不要借此规避订阅、地区、用量、访问控制或服务条款限制。
@@ -73,6 +62,22 @@ bun cdx.ts status
 bun cdx.ts login
 ```
 
+## 脚本 API
+
+除 CLI 外，本包还提供用于脚本集成的受限 API，可查询账号列表、当前启用账号、当前账号用量，并按标签切换账号：
+
+```js
+import {
+  listAccounts,
+  getCurrentAccount,
+  getCurrentAccountUsage,
+  switchNextAccount,
+  switchToAccount,
+} from "@huui/cdx-switcher/api";
+```
+
+API 不提供登录、重新登录、OAuth 或凭据读取能力，也不会输出 CLI 文本或终止调用进程。完整的参数、返回结构、错误码和使用约束见 [API.md](./API.md)。
+
 ## 快速操作流程
 
 ### 1. 添加第一个账号
@@ -85,7 +90,7 @@ cdx login
 
 Windows 若没有打开浏览器、错误打开文件夹，或自动页仍报认证参数错误：
 
-1. 先确认运行的是本仓库发布的 1.8.7 或更高版本：`cdx --version`。
+1. 先确认运行的是本项目已发布的最新版本：`cdx --version`。
 2. 不要关闭运行 `cdx login` 的终端。
 3. 复制终端打印的**完整**授权链接，在正常浏览器地址栏重新打开；不要手动删改 `originator`、`state`、`scope`、`code_challenge` 等参数。
 4. 完成登录后，浏览器必须回跳到 `http://localhost:1455/auth/callback`，终端才会完成保存。
