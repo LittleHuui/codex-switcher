@@ -39,34 +39,38 @@
 
 ## 安装
 
-此个人分叉在发布前必须先替换 npm 包元数据，不能安装或发布为原作者的 `@bjesuiter/codex-switcher` 包名。
+安装本工具需要先安装 [Bun](https://bun.sh)。
 
-发布到你自己的 npm 包后，使用实际包名安装：
+### 安装已发布版本
 
-```bash
-bun install -g <你的-npm-包名>
-```
-
-例如，若你发布的包名是 `@你的-npm-scope/cdx-switcher`，就执行：
+本项目发布到 npm 后，使用以下命令安装：
 
 ```bash
-bun install -g @你的-npm-scope/cdx-switcher
+bun install -g @huui/cdx-switcher
 ```
 
-安装成功后可验证：
+安装后验证：
 
 ```bash
 cdx --version
 cdx --help
 ```
 
-### 从源码运行（不会注册全局 `cdx`）
+### 从当前源码使用
+
+在 npm 版本发布前，或希望直接使用当前源码时：
 
 ```bash
 git clone https://github.com/LittleHuui/codex-switcher.git
 cd codex-switcher
 bun install --frozen-lockfile
-bun cdx.ts --help
+```
+
+之后通过 Bun 执行命令，不会注册全局 `cdx`：
+
+```bash
+bun cdx.ts status
+bun cdx.ts login
 ```
 
 ## 快速操作流程
@@ -214,34 +218,6 @@ cdx keyring install
 ### 远程 SSH / VPS 登录
 
 优先使用普通 `cdx login` 并按终端提示完成手动回调。设备授权模式可能遇到 Cloudflare 验证，不能作为可靠替代方案。
-
-## 开发与发布自己的分叉
-
-### 本地验证
-
-```bash
-bun install --frozen-lockfile
-bun run build
-npm pack --dry-run ./dist
-```
-
-### 首次发布前必须完成
-
-1. 在 npm 注册并登录你自己的账号或 scope。
-2. 修改 `package.json` 的 `name`、`author` 和 `repository`：三者都不能继续指向 `bjesuiter` 或上游仓库。
-3. 推荐使用不包含第三方品牌的包名，例如 `@你的-npm-scope/cdx-switcher`。
-4. 在 GitHub 仓库 Secrets 中配置你自己的 `NPM_TOKEN`；不要复制或使用原作者的令牌。
-5. 执行 `bun run check-publish-metadata`。元数据仍指向上游时，该检查会失败并阻止发布。
-6. 检查 `LICENSE`、`NOTICE`、`THIRD_PARTY_NOTICES.md` 是否随发布内容生成。
-
-### 发布新版本
-
-1. 增加 `package.json` 的版本号。
-2. 按最新 tag 到 `HEAD` 的变化更新 `CHANGELOG.md`，并用相同内容替换本 README 的“当前版本”部分。
-3. 运行本地验证命令和 `bun run check-publish-metadata`。
-4. 提交修改，创建不带前缀的版本 tag，例如 `git tag 1.8.8`。
-5. 推送提交和 tag：`git push && git push --tags`。
-6. 确认 GitHub Actions 的 **Publish to npm** 工作流成功完成。
 
 ## 许可证与署名
 
