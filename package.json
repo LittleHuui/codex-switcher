@@ -1,6 +1,6 @@
 {
   "name": "@huui/cdx-switcher",
-  "version": "1.9.0",
+  "version": "1.9.1",
   "type": "module",
   "description": "Unofficial community CLI for switching locally stored credentials across compatible developer tools",
   "bin": {

@@ -1,6 +1,6 @@
 # cdx API 接口文档
 
-从 `1.9.0` 起，`@huui/cdx-switcher` 提供受限的脚本调用接口，用于读取本机已配置账号的状态、当前账号用量，以及按标签切换账号。
+`@huui/cdx-switcher` 提供受限的脚本调用接口，用于读取本机已配置账号的状态、查询账号用量，以及按标签切换账号。
 
 此接口不提供登录、重新登录、OAuth 流程、密钥库读写或令牌读取能力。
 
@@ -11,6 +11,7 @@ import {
   listAccounts,
   getCurrentAccount,
   getCurrentAccountUsage,
+  getAccountUsages,
   switchNextAccount,
   switchToAccount,
 } from "@huui/cdx-switcher/api";
@@ -61,6 +62,7 @@ import {
 | `CONFIGURATION_ERROR` | 无法读取或解析 cdx 账号配置。 | 否 |
 | `CURRENT_ACCOUNT_UNAVAILABLE` | 当前账号索引无效，或当前账号不存在。 | 否 |
 | `ACCOUNT_LABEL_REQUIRED` | 指定切换时未提供非空标签。 | 否 |
+| `ACCOUNT_LABELS_INVALID` | 批量查询的标签不是字符串数组，或含有去除首尾空格后为空的标签。 | 否 |
 | `ACCOUNT_LABEL_NOT_FOUND` | 未找到指定标签对应的账号。 | 否 |
 | `ACCOUNT_LABEL_DUPLICATED` | 多个账号使用了相同标签，无法确定切换目标。 | 否 |
 | `SECRET_STORE_UNAVAILABLE` | 系统凭据库无法初始化。 | 否 |
@@ -179,6 +181,61 @@ if (!result.ok) {
   for (const window of result.data.windows) {
     console.log(window.kind, window.usedPercent, window.resetsAt);
   }
+}
+```
+
+### `getAccountUsages(labels?)`
+
+用途：一次性并发查询多个账号的用量周期、已用比例与下次重置时间。此接口只读取用量，**不会切换当前账号**；适合自动服务每轮评估只调用一次，再在内存中筛选与排序。
+
+| 参数 | 类型 | 是否必填 | 含义 |
+| --- | --- | --- | --- |
+| `labels` | `string[] \| undefined` | 否 | 需要查询的标签集合。省略或传入空数组时查询全部已配置账号（包括无标签账号）。 |
+
+- 非空 `labels` 会先对每项去除首尾空格；空标签或非字符串标签会使整个调用以 `ACCOUNT_LABELS_INVALID` 失败。
+- 重复标签按首次出现顺序自动去重，不会重复请求同一账号。
+- 指定标签时，账号不存在或标签重复不会中断其余账号；对应项会分别返回 `ACCOUNT_LABEL_NOT_FOUND` 或 `ACCOUNT_LABEL_DUPLICATED`。
+- 查询全部账号时，结果按 cdx 配置顺序返回；无标签账号的结果项 `label` 为 `null`。
+
+返回类型：`Promise<CdxApiResult<AccountUsagesData>>`
+
+顶层 `ok: false` 仅表示配置无法读取、凭据库无法初始化或批量入参整体非法。顶层 `ok: true` 表示整批任务已完成，即使某些账号查询失败；应检查每个 `accounts` 项的 `error`。
+
+`data` 字段：
+
+| 字段 | 类型 | 含义 |
+| --- | --- | --- |
+| `checkedAt` | `string` | 整批查询完成时的 ISO 8601 时间。 |
+| `accounts` | `AccountUsageItem[]` | 单项结果列表，顺序与去重后的输入标签或 cdx 配置账号顺序一致。 |
+
+`AccountUsageItem` 字段：
+
+| 字段 | 类型 | 含义 |
+| --- | --- | --- |
+| `label` | `string \| null` | 请求标签；查询全部账号时，无标签账号为 `null`。 |
+| `account` | `AccountSummary \| null` | 成功定位账号时的安全摘要；标签不存在或重复时为 `null`。 |
+| `usage` | `AccountUsageData \| null` | 查询成功时的用量数据；失败时为 `null`。其中字段与 `getCurrentAccountUsage()` 的成功数据一致。 |
+| `error` | `CdxApiError \| null` | 单项失败的结构化错误；成功时为 `null`。 |
+
+单项错误规则：
+
+| 情况 | `account` | `usage` | `error.code` |
+| --- | --- | --- | --- |
+| 标签不存在 | `null` | `null` | `ACCOUNT_LABEL_NOT_FOUND` |
+| 配置中标签重复 | `null` | `null` | `ACCOUNT_LABEL_DUPLICATED` |
+| 未认证或凭据失效 | 账号摘要 | `null` | `AUTH_FAILED` |
+| 网络错误 | 账号摘要 | `null` | `NETWORK_ERROR` |
+| 上游用量不可解析 | 账号摘要 | `null` | `USAGE_UNAVAILABLE` |
+| 查询成功 | 账号摘要 | 用量数据 | `null` |
+
+```js
+const result = await getAccountUsages(); // 全部已配置账号
+// const result = await getAccountUsages([]); // 同样查询全部账号
+// const result = await getAccountUsages(["主账号", "备用账号"]);
+
+if (result.ok) {
+  const available = result.data.accounts.filter((item) => item.usage !== null);
+  console.log(available);
 }
 ```
 

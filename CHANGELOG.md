@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 1.9.1
+
+### Features
+
+- Add `getAccountUsages(labels?)` for one-shot, concurrent usage reads across
+  all configured accounts or a de-duplicated label set. Individual failures
+  are returned per account without aborting the batch.
+- Add structured batch usage data and the `ACCOUNT_LABELS_INVALID` error code
+  for invalid label collections, while retaining the existing current-account
+  usage API and CLI behavior.
+
 ## 1.9.0
 
 ### Features

@@ -12,6 +12,7 @@ export type CdxApiErrorCode =
   | "CONFIGURATION_ERROR"
   | "CURRENT_ACCOUNT_UNAVAILABLE"
   | "ACCOUNT_LABEL_REQUIRED"
+  | "ACCOUNT_LABELS_INVALID"
   | "ACCOUNT_LABEL_NOT_FOUND"
   | "ACCOUNT_LABEL_DUPLICATED"
   | "SECRET_STORE_UNAVAILABLE"
@@ -95,9 +96,9 @@ export interface CreditsData {
   balance: number | null;
 }
 
-/** `getCurrentAccountUsage` 成功时返回的数据。 */
-export interface CurrentAccountUsageData {
-  /** 被查询的当前启用账号。 */
+/** 单个账号用量查询成功时返回的数据。 */
+export interface AccountUsageData {
+  /** 被查询账号的安全摘要。 */
   account: AccountSummary;
   /** 本次用量数据查询完成时的 ISO 8601 时间。 */
   checkedAt: string;
@@ -107,6 +108,33 @@ export interface CurrentAccountUsageData {
   windows: UsageWindowData[];
   /** 账号额度信息；上游未提供时为 null。 */
   credits: CreditsData | null;
+}
+
+/**
+ * 当前账号用量查询的兼容类型名称。
+ *
+ * 新代码建议使用更通用的 `AccountUsageData`。
+ */
+export type CurrentAccountUsageData = AccountUsageData;
+
+/** 批量查询中的单个账号用量结果。 */
+export interface AccountUsageItem {
+  /** 请求标签；查询全部账号时，无标签账号为 null。 */
+  label: string | null;
+  /** 成功定位账号时的安全摘要；无法唯一定位时为 null。 */
+  account: AccountSummary | null;
+  /** 成功读取用量时的数据；单项失败时为 null。 */
+  usage: AccountUsageData | null;
+  /** 单项失败时的结构化错误；成功时为 null。 */
+  error: CdxApiError | null;
+}
+
+/** 批量账号用量查询成功时返回的数据。 */
+export interface AccountUsagesData {
+  /** 整批查询完成时的 ISO 8601 时间。 */
+  checkedAt: string;
+  /** 顺序与传入标签或 cdx 配置中的账号顺序一致。 */
+  accounts: AccountUsageItem[];
 }
 
 /** 指定账号切换时的输入参数。 */
@@ -186,6 +214,28 @@ const resolveCurrentAccount = (
   return success({ account, index: config.current });
 };
 
+const resolveAccountByLabel = (
+  config: Config,
+  label: string,
+): CdxApiResult<{ account: AccountRecord; index: number }> => {
+  const matchingAccounts = config.accounts
+    .map((account, index) => ({ account, index }))
+    .filter(({ account }) => account.label?.trim() === label);
+
+  if (matchingAccounts.length === 0) {
+    return failure("ACCOUNT_LABEL_NOT_FOUND", `未找到标签为“${label}”的账号。`, false);
+  }
+  if (matchingAccounts.length > 1) {
+    return failure(
+      "ACCOUNT_LABEL_DUPLICATED",
+      `账号标签“${label}”重复，无法确定查询目标。`,
+      false,
+    );
+  }
+
+  return success(matchingAccounts[0]);
+};
+
 const createConfiguredSecretStore = async (): Promise<
   CdxApiResult<SecretStoreAdapter>
 > => {
@@ -245,6 +295,42 @@ const mapAuthTargets = (authResult: {
       ? "cleared"
       : "skipped",
 });
+
+const normalizeUsageLabels = (
+  labels: string[] | undefined,
+): CdxApiResult<string[] | null> => {
+  if (labels === undefined || (Array.isArray(labels) && labels.length === 0)) {
+    return success(null);
+  }
+
+  if (!Array.isArray(labels)) {
+    return failure(
+      "ACCOUNT_LABELS_INVALID",
+      "批量查询账号用量时，标签必须是字符串数组。",
+      false,
+    );
+  }
+
+  const normalizedLabels: string[] = [];
+  const seen = new Set<string>();
+  for (const rawLabel of labels) {
+    if (typeof rawLabel !== "string" || !rawLabel.trim()) {
+      return failure(
+        "ACCOUNT_LABELS_INVALID",
+        "批量查询账号用量时，标签不能为空字符串。",
+        false,
+      );
+    }
+
+    const label = rawLabel.trim();
+    if (!seen.has(label)) {
+      seen.add(label);
+      normalizedLabels.push(label);
+    }
+  }
+
+  return success(normalizedLabels);
+};
 
 /**
  * 返回所有已配置账号的安全摘要。
@@ -310,10 +396,27 @@ export const getCurrentAccountUsage = async (): Promise<
     return secretStoreResult;
   }
 
-  const usageResult = await fetchUsage(
-    currentResult.data.account.accountId,
+  return getAccountUsageData(
+    configResult.data,
+    currentResult.data.account,
+    currentResult.data.index,
     secretStoreResult.data,
   );
+};
+
+const getAccountUsageData = async (
+  config: Config,
+  account: AccountRecord,
+  index: number,
+  secretStore: SecretStoreAdapter,
+): Promise<CdxApiResult<AccountUsageData>> => {
+  let usageResult: UsageResult;
+  try {
+    usageResult = await fetchUsage(account.accountId, secretStore);
+  } catch {
+    return failure("USAGE_UNAVAILABLE", "当前无法获取账号用量。", true);
+  }
+
   if (!usageResult.ok) {
     return mapUsageFailure(usageResult);
   }
@@ -337,11 +440,7 @@ export const getCurrentAccountUsage = async (): Promise<
       : null;
 
     return success({
-      account: formatAccount(
-        currentResult.data.account,
-        currentResult.data.index,
-        configResult.data.current,
-      ),
+      account: formatAccount(account, index, config.current),
       checkedAt: new Date(checkedAtMs).toISOString(),
       planType: usageResult.data.plan_type ?? null,
       windows,
@@ -354,6 +453,116 @@ export const getCurrentAccountUsage = async (): Promise<
       true,
     );
   }
+};
+
+type UsageQueryTarget = {
+  label: string | null;
+  account: AccountRecord;
+  index: number;
+};
+
+type UsageQueryEntry =
+  | { target: UsageQueryTarget }
+  | { label: string; error: CdxApiError };
+
+const getAccountUsageItem = async (
+  config: Config,
+  target: UsageQueryTarget,
+  secretStore: SecretStoreAdapter,
+): Promise<AccountUsageItem> => {
+  const result = await getAccountUsageData(
+    config,
+    target.account,
+    target.index,
+    secretStore,
+  );
+  if (!result.ok) {
+    return {
+      label: target.label,
+      account: formatAccount(target.account, target.index, config.current),
+      usage: null,
+      error: result.error,
+    };
+  }
+
+  return {
+    label: target.label,
+    account: result.data.account,
+    usage: result.data,
+    error: null,
+  };
+};
+
+/**
+ * 并发查询多个已配置账号的周期用量和下一次重置时间。
+ *
+ * 省略标签或传入空数组时查询全部配置账号；指定标签时会按首次出现顺序去重。
+ * 单个账号查询失败不会中断其他账号查询，失败详情会写入对应的 `accounts` 项。
+ */
+export const getAccountUsages = async (
+  labels?: string[],
+): Promise<CdxApiResult<AccountUsagesData>> => {
+  const labelsResult = normalizeUsageLabels(labels);
+  if (!labelsResult.ok) {
+    return labelsResult;
+  }
+
+  const configResult = await loadApiConfig();
+  if (!configResult.ok) {
+    return configResult;
+  }
+
+  const config = configResult.data;
+  const entries: UsageQueryEntry[] = labelsResult.data === null
+    ? config.accounts.map((account, index) => ({
+        target: {
+          label: account.label?.trim() || null,
+          account,
+          index,
+        },
+      }))
+    : labelsResult.data.map((label) => {
+        const accountResult = resolveAccountByLabel(config, label);
+        if (!accountResult.ok) {
+          return { label, error: accountResult.error };
+        }
+
+        return {
+          target: {
+            label,
+            account: accountResult.data.account,
+            index: accountResult.data.index,
+          },
+        };
+      });
+
+  const targets = entries.flatMap((entry) => "target" in entry ? [entry.target] : []);
+  let secretStore: SecretStoreAdapter | null = null;
+  if (targets.length > 0) {
+    const secretStoreResult = await createConfiguredSecretStore();
+    if (!secretStoreResult.ok) {
+      return secretStoreResult;
+    }
+    secretStore = secretStoreResult.data;
+  }
+
+  const accounts = await Promise.all(entries.map(async (entry): Promise<AccountUsageItem> => {
+    if ("error" in entry) {
+      return {
+        label: entry.label,
+        account: null,
+        usage: null,
+        error: entry.error,
+      };
+    }
+
+    return getAccountUsageItem(config, entry.target, secretStore!);
+  }));
+
+  return success({
+    checkedAt: new Date().toISOString(),
+    accounts,
+  });
 };
 
 const switchToIndex = async (
