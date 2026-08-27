@@ -35,7 +35,7 @@
 本项目发布到 npm 后，使用以下命令安装：
 
 ```bash
-bun install -g @huui/cdx-switcher
+bun install -g @huui/cdx-switcher --registry=https://registry.npmjs.org/
 ```
 
 安装后验证：
@@ -154,7 +154,7 @@ cdx relogin <账号-ID-或标签>
 | `cdx keyring install` | 在 Debian/Ubuntu/Mint 安装 Linux keyring 依赖 |
 | `cdx migrate-secrets` | 将 macOS 旧 Keychain 条目迁移到默认后端 |
 | `cdx complete <shell>` | 生成 `zsh`、`bash`、`fish` 或 `powershell` 补全脚本 |
-| `cdx update-self` | 更新已发布的全局包；仅在你自己的 npm 包发布后使用 |
+| `cdx update-self` | 从 npm 官方仓库更新已发布的全局包；`1.9.3` 起更新本社区包，早期版本会更新到上游项目 |
 
 所有命令和选项以 `cdx --help`、`cdx help <命令>` 为准。
 

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 1.9.3
+
+### Fixes
+
+- Make `cdx update-self` install this community package instead of the upstream
+  package, and force Bun/npm updates and documented installation to use the
+  official npm registry.
+- Force the release script to publish through the official npm registry instead
+  of inheriting a configured mirror.
+
 ## 1.9.2
 
 ### Fixes

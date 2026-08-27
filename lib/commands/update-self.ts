@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import * as p from "@clack/prompts";
 import type { Command } from "commander";
+import pkg from "../../package.json";
 import {
   buildUpdateInstallCommand,
   classifyInstallContextFromPath,
@@ -12,7 +13,7 @@ import {
 } from "../runtime/update-manager";
 import { exitWithCommandError } from "./errors";
 
-const PACKAGE_NAME = "@bjesuiter/codex-switcher";
+export const UPDATE_PACKAGE_NAME = pkg.name;
 
 type UpdateSelfOptions = {
   manager?: UpdateManagerOption;
@@ -165,14 +166,17 @@ export const registerUpdateSelfCommand = (program: Command): void => {
             "Could not determine update manager automatically. Re-run with --manager bun|npm|deno.\n",
           );
           process.stderr.write("Manual update commands:\n");
+          const bunCommand = buildUpdateInstallCommand("bun", UPDATE_PACKAGE_NAME);
+          const npmCommand = buildUpdateInstallCommand("npm", UPDATE_PACKAGE_NAME);
+          const denoCommand = buildUpdateInstallCommand("deno", UPDATE_PACKAGE_NAME);
           process.stderr.write(
-            `  bun: ${formatShellCommand("bun", ["add", "-g", `${PACKAGE_NAME}@latest`])}\n`,
+            `  bun: ${formatShellCommand(bunCommand.command, bunCommand.args)}\n`,
           );
           process.stderr.write(
-            `  npm: ${formatShellCommand("npm", ["i", "-g", `${PACKAGE_NAME}@latest`])}\n`,
+            `  npm: ${formatShellCommand(npmCommand.command, npmCommand.args)}\n`,
           );
           process.stderr.write(
-            `  deno: ${formatShellCommand("deno", ["install", "-g", "-f", "-A", "-n", "cdx", `npm:${PACKAGE_NAME}@latest`])}\n`,
+            `  deno: ${formatShellCommand(denoCommand.command, denoCommand.args)}\n`,
           );
           process.exit(1);
         }
@@ -180,7 +184,7 @@ export const registerUpdateSelfCommand = (program: Command): void => {
         const selectedManager: UpdateManager = resolvedManager.manager;
         const command = buildUpdateInstallCommand(
           selectedManager,
-          PACKAGE_NAME,
+          UPDATE_PACKAGE_NAME,
         );
         const printableCommand = formatShellCommand(
           command.command,

@@ -3,6 +3,8 @@ export type InstallManagerKind = "bun" | "npm" | "deno" | "unknown";
 export type UpdateManager = "bun" | "npm" | "deno";
 export type UpdateManagerOption = "auto" | UpdateManager;
 
+export const OFFICIAL_NPM_REGISTRY = "https://registry.npmjs.org/";
+
 export type RuntimeDetectionInput = {
   hasDenoGlobal?: boolean;
   versions?: {
@@ -144,14 +146,24 @@ export const buildUpdateInstallCommand = (
   if (manager === "bun") {
     return {
       command: "bun",
-      args: ["add", "-g", `${packageName}@latest`],
+      args: [
+        "add",
+        "-g",
+        `${packageName}@latest`,
+        `--registry=${OFFICIAL_NPM_REGISTRY}`,
+      ],
     };
   }
 
   if (manager === "npm") {
     return {
       command: "npm",
-      args: ["i", "-g", `${packageName}@latest`],
+      args: [
+        "i",
+        "-g",
+        `${packageName}@latest`,
+        `--registry=${OFFICIAL_NPM_REGISTRY}`,
+      ],
     };
   }
 
