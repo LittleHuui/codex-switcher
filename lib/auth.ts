@@ -15,6 +15,62 @@ const readExistingJson = async (filePath: string): Promise<Record<string, unknow
   }
 };
 
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+
+const readJwtExpiry = (token: string): number | null => {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+
+    const payload = JSON.parse(
+      Buffer.from(parts[1], "base64url").toString("utf8"),
+    ) as { exp?: unknown };
+    return typeof payload.exp === "number" && Number.isFinite(payload.exp)
+      ? payload.exp * 1000
+      : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Reads the OAuth credentials currently active in Codex's file cache.
+ *
+ * A successful return means the entire credential set can safely be copied
+ * back into cdx's per-account vault before another account replaces it. The
+ * access-token expiry is derived from its JWT because Codex's auth.json does
+ * not persist cdx's `expires` field separately.
+ */
+export const readCodexAuthPayload = async (): Promise<OAuthPayload | null> => {
+  const { codexAuthPath } = getPaths();
+  const existing = await readExistingJson(codexAuthPath);
+  const tokens = asRecord(existing.tokens);
+  if (!tokens) return null;
+
+  const access = tokens.access_token;
+  const refresh = tokens.refresh_token;
+  const accountId = tokens.account_id;
+  if (
+    typeof access !== "string" ||
+    typeof refresh !== "string" ||
+    typeof accountId !== "string"
+  ) {
+    return null;
+  }
+
+  const expires = readJwtExpiry(access);
+  if (expires === null) return null;
+
+  const idToken = typeof tokens.id_token === "string"
+    ? tokens.id_token
+    : undefined;
+
+  return { access, refresh, accountId, expires, idToken };
+};
+
 export const writeAuthFile = async (payload: OAuthPayload): Promise<void> => {
   const { authPath } = getPaths();
   const authDir = path.dirname(authPath);

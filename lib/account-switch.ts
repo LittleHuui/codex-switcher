@@ -1,4 +1,8 @@
-import { writeAllAuthFiles, type WriteAuthResult } from "./auth";
+import {
+  readCodexAuthPayload,
+  writeAllAuthFiles,
+  type WriteAuthResult,
+} from "./auth";
 import { saveConfig } from "./config";
 import { getSecretStoreAdapter, type SecretStoreAdapter } from "./secrets/store";
 import type { AccountRecord, Config, OAuthPayload } from "./types";
@@ -26,6 +30,19 @@ export const switchAccountAtIndex = async (
   }
 
   const previousIndex = config.current;
+  const previousAccount = config.accounts[previousIndex];
+
+  // The Desktop app may refresh the current file cache while cdx is not
+  // running. Capture that newer complete credential set before replacing the
+  // cache with the target account, but only when it still belongs to the
+  // account cdx believes is active.
+  if (previousAccount?.accountId) {
+    const activeCodexPayload = await readCodexAuthPayload();
+    if (activeCodexPayload?.accountId === previousAccount.accountId) {
+      await secretStore.save(previousAccount.accountId, activeCodexPayload);
+    }
+  }
+
   const payload = await secretStore.load(account.accountId);
   const authResult = await writeAllAuthFiles(payload);
 

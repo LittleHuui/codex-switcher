@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 1.9.2
+
+### Fixes
+
+- Before switching accounts, preserve the active Codex Desktop credential cache
+  in the account vault when it belongs to the currently selected account. This
+  keeps refreshed credentials, including rotated refresh tokens, from being
+  replaced with an older stored copy on a later switch.
+
 ## 1.9.1
 
 ### Features

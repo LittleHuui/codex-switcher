@@ -1,6 +1,6 @@
 import * as p from "@clack/prompts";
-import { writeAllAuthFiles } from "./auth";
 import { configExists, loadConfig, saveConfig } from "./config";
+import { switchAccountAtIndex } from "./account-switch";
 import {
   performLogin,
   performRefresh,
@@ -115,20 +115,15 @@ export const handleSwitchAccount = async (): Promise<void> => {
     return;
   }
 
-  let payload;
+  let result: Awaited<ReturnType<typeof switchAccountAtIndex>>;
   try {
-    payload = await loadStoredCredentials(selectedAccount.accountId);
+    result = await switchAccountAtIndex(config, selected as number);
   } catch {
     p.log.error(
-      `Missing credentials for account ${selectedAccount.label ?? selectedAccount.accountId}. Re-login with 'cdx login'.`,
+      `Could not switch to ${selectedAccount.label ?? selectedAccount.accountId}. The active account was left unchanged.`,
     );
     return;
   }
-
-  const result = await writeAllAuthFiles(payload);
-
-  config.current = selected as number;
-  await saveConfig(config);
 
   const displayName = selectedAccount.label ?? selectedAccount.accountId;
   const opencodeMark = "✓";
